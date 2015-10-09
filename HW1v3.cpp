@@ -128,16 +128,16 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 		std::cout << "\noff is now increased from "<<ooff<<" by "<< sizeof(HeaderGraph) <<"+"<< hg->len * sizeof(uint64) <<" \n";
 		if (off <= size)
 		{
-			//std::cout << "\nEntered if loop in PB\n";
+			std::cout << "\nEntered if loop in PB\n";
 			//printf("Node %I64u, degree %d\n", hg->hash, hg->len);
 			uint64 *neighbors = (uint64*)(hg + 1);
 			for (int i = 0; i < hg->len; i++)
 			{
-				//printf("  %I64u\n", neighbors[i]);
+				printf("  %I64u\n", neighbors[i]);
 				it = ref.find(neighbors[i]);
 				if (it == ref.end())
 				{
-					ref[neighbors[i]] = 1;
+					ref[neighbors[i]] = 1;	
 				}
 				else
 				{
