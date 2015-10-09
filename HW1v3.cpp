@@ -46,7 +46,6 @@ bool vecSort(std::pair<uint64, int> &firstElem, std::pair<uint64, int> &secondEl
 }
 
 
-//These two incomplete functions were meant to make reading and parsing of data smoother
 void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64, int> &ref);
 void write_to_file(std::map<uint64, int> &edgeMap, int i);
 void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
@@ -87,11 +86,6 @@ void write_to_file(std::map<uint64, int> &edgeMap, int i)
 	std::sort(myVec.begin(), myVec.end(), vecSort);
 	//system("pause");
 	std::cout << "Entered file write phase";
-	//for (int i = 0; i < myVec.size(); i++)
-	//{
-	//	std::cout << myVec[i].first << " - " << myVec[i].second << std::endl;
-	//}
-	//system("pause");
 	std::vector <std::pair <uint64, int >>::const_iterator cIter;
 	const std::string iStr = std::to_string(i);
 	FILE *outHandle = fopen(iStr.c_str(), "wb");
@@ -115,25 +109,29 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 	uint64 size = MAX_RAM;
 	uint64 ooff;
 	std::map<uint64, int>::iterator it;
+	signed long int mynewpos = 0;
 	std::cout << "\noff = "<<off<<" and size = "<<size<<std::endl;
 	//if (off < size - sizeof(HeaderGraph))
 	//	std::cout << "\nCondition met with off, size-HG = " << off << " " << size-sizeof(HeaderGraph)<<" \n";
 	//std::cout << "\nPosn at beginning of loop is is " << ftell(myHandle) << std::endl;
+
+	//At the end 4999...92, enters while and ALWAYS goes into else because of misalignment
 	while (off < size - sizeof(HeaderGraph))
 	{
 		// the header fits in the buffer, so we can read it   
 		HeaderGraph *hg = (HeaderGraph *)(buf + off);
 		ooff = off;
 		off += sizeof(HeaderGraph) + hg->len * sizeof(uint64);
-		std::cout << "\noff is now increased from "<<ooff<<" by "<< sizeof(HeaderGraph) <<"+"<< hg->len * sizeof(uint64) <<" \n";
+		//std::cout << "\noff is now increased from "<<ooff<<" by "<< sizeof(HeaderGraph) <<"+"<< hg->len * sizeof(uint64) <<" \n";
+		ooff = off;
 		if (off <= size)
 		{
-			std::cout << "\nEntered if loop in PB\n";
+			//std::cout << "\nEntered if loop in PB\n";
 			//printf("Node %I64u, degree %d\n", hg->hash, hg->len);
 			uint64 *neighbors = (uint64*)(hg + 1);
 			for (int i = 0; i < hg->len; i++)
 			{
-				printf("  %I64u\n", neighbors[i]);
+				//printf("  %I64u\n", neighbors[i]);
 				it = ref.find(neighbors[i]);
 				if (it == ref.end())
 				{
@@ -150,9 +148,9 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 			// neighbor list overflows buffer; handle boundary case 
 		{
 			std::cout << "\nEntered else loop in PB\n";
-			system("pause");
+			//system("pause");
 			uint64 mypos;
-			signed long int mynewpos=0;
+			
 			int res;
 			size_t succ;
 			//mypos = ftell(myHandle);  mypos is always MAX_RAM, so subtract that from off each time. Subtract That
@@ -169,6 +167,10 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 		}
 
 	}
+	std::cout << "Failed headertest: off = " <<off<<"ooff = "<<ooff<<", size - HeaderGraph = "<<size<<"-"<<sizeof(HeaderGraph);
+	fseek(myHandle, -1 * (MAX_RAM - (ooff)), SEEK_CUR);
+	std::cout<<std::endl<<ftell(myHandle)<<"\n";
+	//Insert statement here to move off backward to 4999....92
 	return;
 }
 
