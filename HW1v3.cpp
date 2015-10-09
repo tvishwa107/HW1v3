@@ -16,7 +16,9 @@
 #include <algorithm>
 #include <Psapi.h>
 
-#define MAX_RAM 500000000
+#define MAX_BUF 250000000
+#define MAX_MAP 246000000
+#define OUT_BUF   4000000
 
 typedef unsigned __int64 uint64;
 typedef unsigned uint;
@@ -39,20 +41,13 @@ public:
 #pragma pack(pop) 
 
 
-// Custom comparator function for std::sort
-bool vecSort(std::pair<uint64, int> &firstElem, std::pair<uint64, int> &secondElem)
-{
-	return firstElem.second > secondElem.second;
-}
-
-
 void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64, int> &ref);
 void write_to_file(std::map<uint64, int> &edgeMap, int i);
 void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
 {
 	std::map<uint64, int> edges;
 	//std::cout << "\nEntered RMH\n";
-	char *buf=(char *)malloc(MAX_RAM*sizeof(char));   // file contents are here
+	char *buf=(char *)malloc(MAX_BUF*sizeof(char));   // file contents are here
 
 	size_t success, retVal = 1;
 	int i = 0;
@@ -60,15 +55,16 @@ void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This i
 		while (!feof(myHandle)) //the end of the while loop is hitting the end of the buffer (ie full MAX_RAM absorbed)
 		{
 			std::cout << "\nEntering retVal loop\n";
-			success = fread(buf, sizeof(char), MAX_RAM, myHandle);
+			success = fread(buf, sizeof(char), MAX_BUF, myHandle);
 			//std::cout << "\n Position is " << ftell(myHandle) << " \n";
 			//At this point, call new function that does the parsing
-			parseBuf(buf, MAX_RAM, myHandle, edges);
+			parseBuf(buf, MAX_BUF, myHandle, edges);
 			//std::cout << "\i is now " << i << "\n";
-			write_to_file(edges, i);
+			//write_to_file(edges, i);
+			std::cout << edges.size();
 			i++;
-			std::cout << "\i is now " << i << "\n";
-			memset(buf, 0, MAX_RAM);
+			std::cout << "\ni is now " << i << "\n";
+			memset(buf, 0, MAX_BUF);
 			std::cout << "Retval final= " << retVal << std::endl;
 		}
     }
@@ -79,7 +75,7 @@ void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This i
 	
 }
 
-void write_to_file(std::map<uint64, int> &edgeMap, int i)
+/*void write_to_file(std::map<uint64, int> &edgeMap, int i)
 {		
 	std::vector<std::pair<uint64, int > > myVec(edgeMap.begin(), edgeMap.end());
 	std::cout << myVec.size();
@@ -101,12 +97,12 @@ void write_to_file(std::map<uint64, int> &edgeMap, int i)
 	fclose(outHandle);
 	return;
 }
-
+*/
 void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &ref)
 {
 	
 	uint64 off = 0;
-	uint64 size = MAX_RAM;
+	uint64 size = MAX_BUF;
 	uint64 ooff;
 	std::map<uint64, int>::iterator it;
 	signed long int mynewpos = 0;
@@ -160,7 +156,7 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 			//mynewpos -= SEEK_CUR+(sizeof(HeaderGraph) + hg->len*sizeof(uint64))-off-1;
 			mynewpos = off - (sizeof(HeaderGraph) + hg->len*sizeof(uint64));
 			//std::cout << "\nval = " <<  off- (sizeof(HeaderGraph) + hg->len*sizeof(uint64));
-			res = fseek(myHandle, -1*(MAX_RAM-mynewpos), SEEK_CUR);
+			res = fseek(myHandle, -1*(MAX_BUF-mynewpos), SEEK_CUR);
 			std::cout << "	\nPB went else and is returning 0 and file pointer is now at posn "<<ftell(myHandle)<<"\n";
 			//system("pause");
 			return;
@@ -168,7 +164,7 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 
 	}
 	std::cout << "Failed headertest: off = " <<off<<"ooff = "<<ooff<<", size - HeaderGraph = "<<size<<"-"<<sizeof(HeaderGraph);
-	fseek(myHandle, -1 * (MAX_RAM - (ooff)), SEEK_CUR);
+	fseek(myHandle, -1 * (MAX_BUF - (ooff)), SEEK_CUR);
 	std::cout<<std::endl<<ftell(myHandle)<<"\n";
 	//Insert statement here to move off backward to 4999....92
 	return;
