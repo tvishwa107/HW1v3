@@ -16,8 +16,7 @@
 #include <algorithm>
 #include <Psapi.h>
 
-#define MAX_BUF 250000000
-#define MAX_MAP 246000000
+#define MAX_BUF 495000000
 #define OUT_BUF   4000000
 
 typedef unsigned __int64 uint64;
@@ -41,31 +40,37 @@ public:
 #pragma pack(pop) 
 
 
-void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64, int> &ref);
-void write_to_file(std::map<uint64, int> &edgeMap, int i);
+void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int k);
+
+void buffer_to_file(char *Buf, uint64 i, int k, FILE *outHandle);
+
+void sort_file()
+{
+
+
+
+
+}
+
+
 void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
 {
-	std::map<uint64, int> edges;
 	//std::cout << "\nEntered RMH\n";
 	char *buf=(char *)malloc(MAX_BUF*sizeof(char));   // file contents are here
-
-	size_t success, retVal = 1;
+	char *outBuf = (char *)malloc(OUT_BUF*sizeof(char));
+	size_t success;
 	int i = 0;
 	try{
 		while (!feof(myHandle)) //the end of the while loop is hitting the end of the buffer (ie full MAX_RAM absorbed)
 		{
-			std::cout << "\nEntering retVal loop\n";
+			//std::cout << "\nEntering retVal loop\n";
 			success = fread(buf, sizeof(char), MAX_BUF, myHandle);
 			//std::cout << "\n Position is " << ftell(myHandle) << " \n";
 			//At this point, call new function that does the parsing
-			parseBuf(buf, MAX_BUF, myHandle, edges);
-			//std::cout << "\i is now " << i << "\n";
-			//write_to_file(edges, i);
-			std::cout << edges.size();
+			parseBuf(buf, MAX_BUF, myHandle, outBuf, i);
 			i++;
-			std::cout << "\ni is now " << i << "\n";
+			std::cout << "\i is now " << i <<	 "\n";
 			memset(buf, 0, MAX_BUF);
-			std::cout << "Retval final= " << retVal << std::endl;
 		}
     }
 	catch(int e)
@@ -75,43 +80,59 @@ void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This i
 	
 }
 
-/*void write_to_file(std::map<uint64, int> &edgeMap, int i)
+
+uint64 write_to_buffer(HeaderGraph *hg, char *outBuf, uint64 i, int k, FILE *outHandle)
 {		
-	std::vector<std::pair<uint64, int > > myVec(edgeMap.begin(), edgeMap.end());
-	std::cout << myVec.size();
-	std::sort(myVec.begin(), myVec.end(), vecSort);
-	//system("pause");
-	std::cout << "Entered file write phase";
-	std::vector <std::pair <uint64, int >>::const_iterator cIter;
-	const std::string iStr = std::to_string(i);
-	FILE *outHandle = fopen(iStr.c_str(), "wb");
-	if (outHandle == NULL)
-	{
-		std::cout << "File didn't open";
-		return;
+	//i is the number of HeaderGraphs written, k is the number n of the file name eg. 0,1,2
+	//need to maintain a count on current position
+   
+	if (((i+1)*sizeof(HeaderGraph)) > OUT_BUF)
+	{ 
+		//std::cout << "\ni=" << i << std::endl;
+		buffer_to_file(outBuf, i, k, outHandle); //copy buffer to file
+		//std::cout << "Done";
+		memset(outBuf, 0, OUT_BUF);   //reset buffer
+		return 0; //reset count of number in buffer
 	}
-	for (cIter = myVec.begin(); cIter != myVec.end(); ++cIter)
+	else //buffer can hold one more at least
 	{
-		fprintf(outHandle, "%I64u %d", cIter->first, cIter->second);
+	    memcpy(outBuf + i*sizeof(HeaderGraph), hg, sizeof(HeaderGraph)); 
+		return ++i;
 	}
-	fclose(outHandle);
-	return;
 }
-*/
-void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &ref)
+
+void buffer_to_file(char *buf, uint64 i, int k, FILE *outHandle)
+{
+	size_t succ = fwrite(buf, sizeof(HeaderGraph), i, outHandle);
+	if(succ!=i)
+	{
+		//std::cout << "succ = " << succ << " and i = " << i;
+		//system("pause");
+		exit(1);
+	}
+	//else std::cout << "succ = i = " << succ << " " << i << std::endl;
+	return;
+
+//5:40PM failing because I'm not closing any file handles, annd I'm not maintaining the position in the file either
+}
+
+void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int k)
 {
 	
 	uint64 off = 0;
 	uint64 size = MAX_BUF;
-	uint64 ooff;
-	std::map<uint64, int>::iterator it;
+	uint64 bufsize = OUT_BUF;
+	uint64 ooff, num = 0;
 	signed long int mynewpos = 0;
-	std::cout << "\noff = "<<off<<" and size = "<<size<<std::endl;
+	//std::cout << "\noff = "<<off<<" and size = "<<size<<std::endl;
+	
+	const std::string kStr = std::to_string(k);
+	//std::cout << "\nWriting to file " << k << std::endl;
+	FILE *outHandle = fopen(kStr.c_str(), "wb");
 	//if (off < size - sizeof(HeaderGraph))
 	//	std::cout << "\nCondition met with off, size-HG = " << off << " " << size-sizeof(HeaderGraph)<<" \n";
 	//std::cout << "\nPosn at beginning of loop is is " << ftell(myHandle) << std::endl;
 
-	//At the end 4999...92, enters while and ALWAYS goes into else because of misalignment
 	while (off < size - sizeof(HeaderGraph))
 	{
 		// the header fits in the buffer, so we can read it   
@@ -128,22 +149,18 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 			for (int i = 0; i < hg->len; i++)
 			{
 				//printf("  %I64u\n", neighbors[i]);
-				it = ref.find(neighbors[i]);
-				if (it == ref.end())
-				{
-					ref[neighbors[i]] = 1;	
-				}
-				else
-				{
-					it->second++;
-				}
+				HeaderGraph temp;
+				temp.hash = neighbors[i];
+				temp.len = 1;
+				num = write_to_buffer(&temp, outBuf,num, k, outHandle);
+				
 
 			}
 		}
 		else
 			// neighbor list overflows buffer; handle boundary case 
 		{
-			std::cout << "\nEntered else loop in PB\n";
+			//std::cout << "\nEntered else loop in PB\n";
 			//system("pause");
 			uint64 mypos;
 			
@@ -157,26 +174,19 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, std::map<uint64,int> &
 			mynewpos = off - (sizeof(HeaderGraph) + hg->len*sizeof(uint64));
 			//std::cout << "\nval = " <<  off- (sizeof(HeaderGraph) + hg->len*sizeof(uint64));
 			res = fseek(myHandle, -1*(MAX_BUF-mynewpos), SEEK_CUR);
-			std::cout << "	\nPB went else and is returning 0 and file pointer is now at posn "<<ftell(myHandle)<<"\n";
+			//std::cout << "	\nPB went else and is returning 0 and file pointer is now at posn "<<ftell(myHandle)<<"\n";
 			//system("pause");
 			return;
 		}
 
 	}
-	std::cout << "Failed headertest: off = " <<off<<"ooff = "<<ooff<<", size - HeaderGraph = "<<size<<"-"<<sizeof(HeaderGraph);
+	//std::cout << "Failed headertest: off = " <<off<<"ooff = "<<ooff<<", size - HeaderGraph = "<<size<<"-"<<sizeof(HeaderGraph);
 	fseek(myHandle, -1 * (MAX_BUF - (ooff)), SEEK_CUR);
 	std::cout<<std::endl<<ftell(myHandle)<<"\n";
-	//Insert statement here to move off backward to 4999....92
+	fclose(outHandle);
 	return;
 }
 
-/*void merge_files()
-{
-		
-
-}
-
-*/
 int main(int argc, char *argv[])
 {
 
