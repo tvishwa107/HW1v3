@@ -15,12 +15,14 @@
 #include <map>
 #include <algorithm>
 #include <Psapi.h>
+#include <ctime>
 
 #define MAX_BUF 495000000
 #define OUT_BUF   4000000
 
 typedef unsigned __int64 uint64;
 typedef unsigned uint;
+
 #pragma pack(push,1)   // change struct packing to 1 byte 
 class HeaderGraph {
 public:
@@ -44,9 +46,25 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k);
 
 void buffer_to_file(char *Buf, uint64 i, int *k, FILE *outHandle);
 
-void sort_file()
+bool custom_sort(const HeaderGraph &a, const HeaderGraph &b)
 {
+	return (a.hash) < (b.hash);
+}
 
+int ceil(int a, int b)
+{
+	int c = a%b == 0 ? (a / b) : (float(a) / float(b)) + 1;
+	return c;
+}
+
+void merge_files(int *k)
+{
+	int a = *k;
+	while(ceil(a,4))
+	{
+
+
+	}
 
 
 
@@ -67,7 +85,7 @@ FILE *make_Handle(int *k, FILE *optHandle = NULL)
 	return outHandle;
 }
 
-void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
+int * readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
 {
 	//std::cout << "\nEntered RMH\n";
 	char *buf=(char *)malloc(MAX_BUF*sizeof(char));   // file contents are here
@@ -85,12 +103,14 @@ void readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This i
 			//std::cout << "\ni is now " << *k <<	 "\n";
 			memset(buf, 0, MAX_BUF);
 		} while (success == MAX_BUF);
+		free(buf);
+		free(outBuf);
     }
 	catch(int e)
 	{
 		std::cout << "\n Exception Number " << e;
 	}
-	
+	return k;
 }
 
 
@@ -110,19 +130,14 @@ uint64 write_to_buffer(HeaderGraph *hg, char *outBuf, uint64 i, int *k, FILE *ou
 		buffer_to_file(outBuf, i, k, outHandle); //copy buffer to file
 												 //std::cout << "Done";
 		++*k;
-		outHandle = make_Handle(k,outHandle);
 		memset(outBuf, 0, OUT_BUF);   //reset buffer
-		return 0; //reset count of number in buffer
+		return -1; //main buffer is full
 //once you've added this, after the first time, you need a way to signal that it's time to close and open a new file
 	}
 	if (((i+1)*sizeof(HeaderGraph)) > OUT_BUF)
 	{ 
-		//std::cout << "\ni=" << i << std::endl;
 		
 		buffer_to_file(outBuf, i, k, outHandle); //copy buffer to file
-		
-		//std::cout << "Done";
-		//system("pause");
 		
 		memset(outBuf, 0, OUT_BUF);   //reset buffer
 		return 0; //reset count of number in buffer
@@ -185,7 +200,13 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k)
 				temp.hash = neighbors[i];
 				temp.len = 1;
 				num = write_to_buffer(&temp, outBuf,num, k, outHandle);
-				
+				if (num == -1)
+				{
+					make_Handle(k, outHandle);
+					num = 0;
+
+				}
+				//idea: return -1 to indicate time to close this handle and open a new handle
 
 			}
 		}
@@ -228,7 +249,7 @@ int main(int argc, char *argv[])
 	errno_t errMap, errData;
 	//errMap = fopen_s(&inMap, "C:\\Users\\tvish_000\\Downloads\\PLD-map-(1).dat", "rb");
 	errData = fopen_s(&inData, argv[1], "rb");
-
+	int *a;
 	//if (errMap)
 	//{
 	//	std::cerr << "Can't open input map file " <<std::endl;
@@ -241,7 +262,35 @@ int main(int argc, char *argv[])
 	else 
 	{
 		std::cout << "\nEntered else, so file opened\n";
-		readMyHandle(inData);
+		//a=readMyHandle(inData);
+		int b = 30;
+		int *a = &b;
+		std::cout << *a << std::endl;
+		char *myBuf = (char *)malloc(MAX_BUF*sizeof(char));
+		
+		for (int l = 0; l <= *a; l++)
+		{
+			std::cout << "\n l = " << l << std::endl;
+			const std::string lStr = std::to_string(l);
+			HANDLE h = CreateFile(lStr.c_str(),GENERIC_READ,0,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+			DWORD red;
+			ReadFile(h, myBuf, MAX_BUF, &red, NULL);
+			std::cout << red << std::endl;
+			uint64 hgNum = MAX_BUF / sizeof(HeaderGraph);
+			HeaderGraph *hgBuf = (HeaderGraph *)myBuf;
+			std::cout << "Pre sort\n";
+			clock_t begin = clock();
+			std::sort(hgBuf, hgBuf+hgNum,custom_sort);
+			clock_t end = clock();
+			double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+			std::cout << elapsed << std::endl;
+			std::cout << "Sort complete\n";
+			WriteFile(h, hgBuf, MAX_BUF, &red, NULL);
+			std::cout << "Write successful";
+			std::cout << "\n l = " << l << std::endl;
+		}
+		free(myBuf);
+        
 		
 	} 
 	getchar();
