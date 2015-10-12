@@ -42,67 +42,219 @@ public:
 #pragma pack(pop) 
 
 
-void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k);
+void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, FILE *outHandle);
 
-void buffer_to_file(char *Buf, uint64 i, int *k, FILE *outHandle);
+void buffer_to_file(char *Buf, uint64 i, FILE *outHandle);
 
 bool custom_sort(const HeaderGraph &a, const HeaderGraph &b)
 {
 	return (a.hash) < (b.hash);
 }
 
-int ceil(int a, int b)
+
+
+int num_merges(int k)
 {
-	int c = a%b == 0 ? (a / b) : (float(a) / float(b)) + 1;
-	return c;
+	int rem;
+	int merge = 1;
+	do
+	{
+		rem = k % 4;
+		merge += k / 4;
+		k = (k / 4) + rem;
+
+
+
+	} while (k > 4);
+	return merge;
 }
 
-void merge_files(int *k)
+BOOL write_to_file(HANDLE h, HeaderGraph *buf, BOOL h5Write)
 {
-	int a = *k;
-	while(ceil(a,4))
+	DWORD dH5;
+	WriteFile(h, buf, 333333 * sizeof(HeaderGraph), &dH5, NULL);
+	memset(buf, 0, OUT_BUF);
+	return h5Write;
+
+}
+
+int count_zeroes(int *k,int num)
+{
+	int count = 0;
+	for (int i = 0; i < num; i++)
 	{
+		if ( k[i] == 0)
+			count++;
+	}
+	return count;
+
+}
+
+
+void merge_files(int start_point, int *max, int a = 4) //merges two/built for four files at a time. Need to modify the inputs and outputs
+{
+	int *merge_empty = new int[k]();
+	//int l = 0, m = 1, n = 2, p = 3,z=1; //probably better in that other function that initiates the merge
+	int *points = new int[a];
+	for (in hazz = 0; hazz < a; hazz++)
+		points[hazz] = a + hazz;
+	HeaderGraph *buf1 = new HeaderGraph[MAX_BUF/4];
+	HeaderGraph *buf2 = new HeaderGraph[MAX_BUF/4];
+	HeaderGraph *buf3 = new HeaderGraph[MAX_BUF/4];
+	HeaderGraph *buf4 = new HeaderGraph[MAX_BUF/4];
+	HeaderGraph *buf = new HeaderGraph[OUT_BUF];
+	uint64 ha, hb, hc, hd, ho;
+	uint64 old1, old2, old3, old4;
+	ha = hb = hc = hd = ho=0;
+	DWORD dH[4];
+	BOOL h1Read, h2Read, h3Read, h4Read;
+	BOOL h5Write;
+	HANDLE h[4];
+	do {
+		const std::string lStr = std::to_string(points[0]); //cut and put in main merge function
+		const std::string mStr = std::to_string(points[1]);
+		const std::string nStr = std::to_string(points[2]);
+		const std::string pStr = std::to_string(points[3]);
+		const std::string zStr = std::to_string(max);
+		HANDLE h[0] = CreateFile(lStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		HANDLE h[1] = CreateFile(mStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		//HANDLE h[2] = CreateFile(nStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		//HANDLE h[3] = CreateFile(pStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		HANDLE h = CreateFile(zStr.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		h1Read = ReadFile(h[0], buf1, MAX_BUF/4, &dH[0], NULL);
+		h2Read = ReadFile(h[1], buf2, MAX_BUF/4, &dH[1], NULL);
+
+
+		while (ha < MAX_BUF / 48 || hb < MAX_BUF / 48 || hc < MAX_BUF / 48 || hd < MAX_BUF / 48) // at least one buffer is not empty
+		{
+			if (buf + sizeof(HeaderGraph) >= OUT_BUF)
+			{
+				h5Write = write_to_file(h, buf, h5Write);
+				ho = 0;
+			}
+
+			else //still have space in outbuffer
+			{
+				if (buf1[ha]->hash < buf2[hb]->hash)
+				{
+					old1 = ha;
+					while (buf1[ha]->hash == buf1[old1]->hash)
+					{
+						ha++;
+					}
+					memcpy(buf + ho, buf1 + old1, (ha - old1)*sizeof(HeaderGraph));
+					ho += (ha - old1);
+				}
+				else
+				{
+					old2 = hb;
+					while (buf2[hb]->hash == buf2[old2]->hash)
+					{
+						hb++;
+					}
+					memcpy(buf + ho, buf2 + old2, (hb - old2)*sizeof(HeaderGraph));
+					ho += (hb - old2);
+				}
+
+
+
+			}
+			if (ha == MAX_BUF / 48)
+			{
+				h1Read = ReadFile(h[1], buf1, MAX_BUF / 4, &dH[0], NULL);
+				ha = 0;
+			}
+			if (hb == MAX_BUF / 48)
+			{
+				h2Read = ReadFile(h[2], buf2, MAX_BUF / 4, &dH[1], NULL);
+				hb = 0;
+			}
+			if (hc == MAX_BUF / 48)
+			{
+				h3Read = ReadFile(h[3], buf3, MAX_BUF / 4, &dH[2], NULL);
+				hc = 0;
+			}
+			if (hd == MAX_BUF / 48)
+			{
+				h4Read = ReadFile(h[4], buf4, MAX_BUF / 4, &dH[3], NULL);
+				hd = 0;
+			}
+
+		}
+		if (dH[0] == 0)
+		{
+			CloseHandle(h1);
+			merge_empty[0] = 1;
+		}
+		if (dH[1] == 0)
+		{
+			CloseHandle(h2);
+			merge_empty[1] = 1;
+		}
+		if (dH[2] == 0)
+		{
+			CloseHandle(h3);
+			merge_empty[2] = 1;
+		}
+		if (dH[3] == 0)
+		{
+			CloseHandle(h4);
+			merge_empty[3] = 1;
+		}
+
+
+	} while (dH[0] || dH[1] || dH[2] || dH[3]);
+	CloseHandle(h);
+
+	for (int var = 0; var < 4;var++)
+		if (merge_empty[var] == 0)
+			CloseHandle(h[var]);
+	(*max)++;
+
+}
+
+
+
+void merge_call(int l)
+{
+	int k = num_merges(l);
+	int *merger = new int[k]();
+	int *max = &k;
+	int a = count_zeroes(merger, k);
+	int l = 0;
+	while (a > 1)
+	{
+		if(a<=4)
+			merge_files(l,max,a);
+		else merge_files(l,max);
+		
 
 
 	}
 
 
 
+
+
 }
 
 
-//When is makeHandle called? When the buffer becomes full in the middle of processing
-FILE *make_Handle(int *k, FILE *optHandle = NULL)
-{
-	if (optHandle)
-	{
-		fclose(optHandle);
-		std::cout << "\nclosing file " << *k << " and opening file " << (*k)+1<<std::endl;
-	}
-	const std::string kStr = std::to_string(*k);
-	FILE *outHandle = fopen(kStr.c_str(), "wb");
-	std::cout<<"Opened file " << (*k) + 1 << std::endl;
-	return outHandle;
-}
-
-int * readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
+void readMyHandle(FILE *myHandle, FILE *outHandle) //reads the file till buffer ends ONCE. This is the next place to be edited
 {
 	//std::cout << "\nEntered RMH\n";
 	char *buf=(char *)malloc(MAX_BUF*sizeof(char));   // file contents are here
 	char *outBuf = (char *)malloc(OUT_BUF*sizeof(char));
 	size_t success;
-	int i = 0;
-	int *k = &i;
 	try{
 		do {
 			//std::cout << "\nEntering retVal loop\n";
 			success = fread(buf, sizeof(char), MAX_BUF, myHandle);
 			//std::cout << "\n Position is " << ftell(myHandle) << " \n";
 			//At this point, call new function that does the parsing
-			parseBuf(buf, MAX_BUF, myHandle, outBuf, k);
+			parseBuf(buf, MAX_BUF, myHandle, outBuf,outHandle);
 			//std::cout << "\ni is now " << *k <<	 "\n";
 			memset(buf, 0, MAX_BUF);
-		} while (success == MAX_BUF);
+		} while (success == MAX_BUF); //edited to let me copy 4x Max RAM
 		free(buf);
 		free(outBuf);
     }
@@ -110,40 +262,22 @@ int * readMyHandle(FILE *myHandle) //reads the file till buffer ends ONCE. This 
 	{
 		std::cout << "\n Exception Number " << e;
 	}
-	return k;
 }
 
 
-uint64 write_to_buffer(HeaderGraph *hg, char *outBuf, uint64 i, int *k, FILE *outHandle)
+uint64 write_to_buffer(HeaderGraph *hg, char *outBuf, uint64 i, FILE *outHandle)
 {		
-	//i is the number of HeaderGraphs written, k is the number n of the file name eg. 0,1,2
-	
-//option 1: do what he did, but mine's already slower
-//2: rerun mine, with a limit on how big the file can be. i'll try 2
+	//i is the number of HeaderGraphs written to the outBuf so far
 
-	if(ftell(outHandle)+sizeof(HeaderGraph)>=MAX_BUF)
-	{
-		//std::cout << "outHandle = ";
-		//std::cout << ftell(outHandle);
-		//std::cout << "\ni=" << i << std::endl;
-		//system("pause");
-		buffer_to_file(outBuf, i, k, outHandle); //copy buffer to file
-												 //std::cout << "Done";
-		++*k;
-		memset(outBuf, 0, OUT_BUF);   //reset buffer
-		return -1; //main buffer is full
-//once you've added this, after the first time, you need a way to signal that it's time to close and open a new file
-	}
 	if (((i+1)*sizeof(HeaderGraph)) > OUT_BUF)
 	{ 
 		
-		buffer_to_file(outBuf, i, k, outHandle); //copy buffer to file
-		
+		buffer_to_file(outBuf, i, outHandle); //copy buffer to file
 		memset(outBuf, 0, OUT_BUF);   //reset buffer
 		return 0; //reset count of number in buffer
 	}
 	else //buffer can hold one more at least
-	{
+	{	
 		//std::cout << "\nEse in W2B\n";
 	    memcpy(outBuf + i*sizeof(HeaderGraph), hg, sizeof(HeaderGraph)); 
 		//std::cout << "\ni = " << i;
@@ -152,22 +286,16 @@ uint64 write_to_buffer(HeaderGraph *hg, char *outBuf, uint64 i, int *k, FILE *ou
 }
 
 
-void buffer_to_file(char *buf, uint64 i, int *k, FILE *outHandle)
+void buffer_to_file(char *buf, uint64 i, FILE *outHandle)
 {
-	size_t succ = fwrite(buf, sizeof(HeaderGraph), i, outHandle);
-	if(succ==0)
-	{
-		//std::cout << "succ = " << succ << " and i = " << i;
-		//system("pause");
-		return;
-	}
+	fwrite(buf, sizeof(HeaderGraph), i, outHandle);
 	//else std::cout << "succ = i = " << succ << " " << i << std::endl;
 	return;
 
 
 }
 
-void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k)
+void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, FILE *outHandle)
 {
 	
 	uint64 off = 0;
@@ -175,10 +303,6 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k)
 	uint64 bufsize = OUT_BUF;
 	uint64 ooff, num = 0;
 	signed long int mynewpos = 0;
-	//std::cout << "\noff = "<<off<<" and size = "<<size<<std::endl;
-	
-
-	FILE *outHandle = make_Handle(k);
 
 	while (off < size - sizeof(HeaderGraph))
 	{
@@ -199,13 +323,8 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k)
 				HeaderGraph temp;
 				temp.hash = neighbors[i];
 				temp.len = 1;
-				num = write_to_buffer(&temp, outBuf,num, k, outHandle);
-				if (num == -1)
-				{
-					make_Handle(k, outHandle);
-					num = 0;
-
-				}
+				num = write_to_buffer(&temp, outBuf,num, outHandle);
+	
 				//idea: return -1 to indicate time to close this handle and open a new handle
 
 			}
@@ -236,6 +355,26 @@ void parseBuf(char *buf, int bytesToRead, FILE* myHandle, char *outBuf, int *k)
 	return;
 }
 
+void copy_smaller(FILE *inF, FILE *outF)
+{
+	char *readBuf = (char *)malloc(sizeof(char) *MAX_BUF);
+	int i = 0;
+	clock_t begin = clock();
+	while (i < 4)
+	{
+		std::cout << i << std::endl;
+		fread(readBuf, sizeof(char), MAX_BUF, inF);
+		fwrite(readBuf, sizeof(char), MAX_BUF, outF);
+		i++;
+	}
+	clock_t end = clock();
+	double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+	std::cout << elapsed << "\n";
+	return;
+
+}
+
+
 int main(int argc, char *argv[])
 {
 
@@ -245,11 +384,10 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	FILE *inMap, *inData;
+	FILE *inMap, *inData, *outData;
 	errno_t errMap, errData;
 	//errMap = fopen_s(&inMap, "C:\\Users\\tvish_000\\Downloads\\PLD-map-(1).dat", "rb");
 	errData = fopen_s(&inData, argv[1], "rb");
-	int *a;
 	//if (errMap)
 	//{
 	//	std::cerr << "Can't open input map file " <<std::endl;
@@ -261,38 +399,66 @@ int main(int argc, char *argv[])
 	}
 	else 
 	{
-		std::cout << "\nEntered else, so file opened\n";
-		//a=readMyHandle(inData);
-		int b = 30;
-		int *a = &b;
-		std::cout << *a << std::endl;
-		char *myBuf = (char *)malloc(MAX_BUF*sizeof(char));
+
+		errno_t errOut;
+		errOut = fopen_s(&outData, "outSample", "wb");
+		//std::cout << "\nEntered else, so file opened\n";
+		readMyHandle(inData, outData);
+		//copy_smaller(inData, outData);
+		fclose(inData);
+		fclose(outData);
+		//int b = 30;
+		//int *a = &b;
+		//std::cout << *a << std::endl;
+	
 		
-		for (int l = 0; l <= *a; l++)
-		{
-			std::cout << "\n l = " << l << std::endl;
-			const std::string lStr = std::to_string(l);
-			HANDLE h = CreateFile(lStr.c_str(),GENERIC_READ,0,NULL,OPEN_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
-			DWORD red;
-			ReadFile(h, myBuf, MAX_BUF, &red, NULL);
-			std::cout << red << std::endl;
-			uint64 hgNum = MAX_BUF / sizeof(HeaderGraph);
+		DWORD red,blue;
+		char *myBuf = (char *)malloc(MAX_BUF*sizeof(char));
+		HANDLE h = CreateFile("outSample", GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		BOOL bResult, cResult;
+		HANDLE hOut;
+		int l = 0;
+		uint64 hgNum = MAX_BUF / sizeof(HeaderGraph);
+		do {
+			bResult = ReadFile(h, myBuf, MAX_BUF, &red, NULL);
+			if (!bResult || red == 0)
+			{
+				std::cout << bResult << " " << red << std::endl;
+				DWORD dw = GetLastError();
+				std::cout << "General failure. GetLastError returned " << std::hex
+					<< dw << ".\n";
+
+			}
 			HeaderGraph *hgBuf = (HeaderGraph *)myBuf;
-			std::cout << "Pre sort\n";
 			clock_t begin = clock();
-			std::sort(hgBuf, hgBuf+hgNum,custom_sort);
+			std::sort(hgBuf, hgBuf + hgNum, custom_sort);
 			clock_t end = clock();
 			double elapsed = double(end - begin) / CLOCKS_PER_SEC;
-			std::cout << elapsed << std::endl;
-			std::cout << "Sort complete\n";
-			WriteFile(h, hgBuf, MAX_BUF, &red, NULL);
-			std::cout << "Write successful";
-			std::cout << "\n l = " << l << std::endl;
-		}
-		free(myBuf);
-        
+			std::cout << "l = " << l << std::endl << "\nred= " << red;
+			const std::string lStr = std::to_string(l);
+			hOut = CreateFile(lStr.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			DWORD dw = GetLastError();
+			std::cout << "General failure. To create, GetLastError returned " << std::hex
+				<< dw << ".\n";
+			cResult = WriteFile(hOut, hgBuf, MAX_BUF, &blue, NULL);
+			DWORD dwl = GetLastError();
+			std::cout << "General failure. GetLastError returned " << std::hex
+				<< dwl << "\n";
+			if (!cResult || blue == 0)
+			{
+				std::cout <<"\n"<< cResult << " " << blue << std::endl;
+			}
+			l++;
+			CloseHandle(hOut);
+		} while (bResult && red!=0);
 		
+		//merge using l
+		//merge_call(l);
+
+
+		free(myBuf);
 	} 
+	std::cout << "\nDONE!\n";
 	getchar();
 
 }
