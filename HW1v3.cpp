@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <Psapi.h>
 #include <ctime>
+#include <sstream>
 
 #define MAX_BUF 495000000
 #define OUT_BUF   4000000
@@ -71,8 +72,11 @@ int num_merges(int k)
 
 BOOL write_to_file(HANDLE h, HeaderGraph *buf, BOOL h5Write)
 {
-	DWORD dH5;
+	DWORD dH5,dw;
 	WriteFile(h, buf, 333333 * sizeof(HeaderGraph), &dH5, NULL);
+	dw = GetLastError();
+	std::cout << "General failure. GetLastError returned " << std::hex
+		<< dw << ".\n";
 	memset(buf, 0, OUT_BUF);
 	return h5Write;
 
@@ -93,118 +97,166 @@ int count_zeroes(int *k,int num)
 
 void merge_files(int start_point, int *max, int a = 4) //merges two/built for four files at a time. Need to modify the inputs and outputs
 {
-	int *merge_empty = new int[k]();
+	std::cout << "Entered merge files \n";
+	int *merge_empty = new int[a]();
 	//int l = 0, m = 1, n = 2, p = 3,z=1; //probably better in that other function that initiates the merge
 	int *points = new int[a];
-	for (in hazz = 0; hazz < a; hazz++)
-		points[hazz] = a + hazz;
-	HeaderGraph *buf1 = new HeaderGraph[MAX_BUF/4];
-	HeaderGraph *buf2 = new HeaderGraph[MAX_BUF/4];
-	HeaderGraph *buf3 = new HeaderGraph[MAX_BUF/4];
-	HeaderGraph *buf4 = new HeaderGraph[MAX_BUF/4];
-	HeaderGraph *buf = new HeaderGraph[OUT_BUF];
-	uint64 ha, hb, hc, hd, ho;
-	uint64 old1, old2, old3, old4;
-	ha = hb = hc = hd = ho=0;
+	for (int hazz = 0; hazz < a; hazz++)
+		points[hazz] = start_point + hazz;
+	HeaderGraph **buf = new HeaderGraph* [a];
+	for(int myvar = 0; myvar < a; myvar++)
+		buf[myvar] = new HeaderGraph[MAX_BUF/4];
+	
+	//HeaderGraph *buf1 = new HeaderGraph[MAX_BUF/4];
+	//HeaderGraph *buf2 = new HeaderGraph[MAX_BUF/4];
+	//HeaderGraph *buf3 = new HeaderGraph[MAX_BUF/4];
+	//HeaderGraph *buf4 = new HeaderGraph[MAX_BUF/4];
+	HeaderGraph *bufOut = new HeaderGraph[OUT_BUF];
+	
+	//uint64 ha, hb, hc, hd, ho;
+	uint64 *hCount = new uint64[a]();
+	//ha = hb = hc = hd = ho=0;
+	uint64 ho = 0;
+	uint64 *old = new uint64[4]();
+	//uint64 old1, old2, old3, old4;
 	DWORD dH[4];
-	BOOL h1Read, h2Read, h3Read, h4Read;
-	BOOL h5Write;
-	HANDLE h[4];
+	BOOL *hRead = new BOOL[4]();
+	//BOOL h1Read, h2Read, h3Read, h4Read;
+	BOOL h5Write = 0;
+	HANDLE *h = new HANDLE[4]();
+	std::vector<std::string> v;
+	DWORD dw;
+	std::string zStr = std::to_string(*max);
+	HANDLE hOut = CreateFile(zStr.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	do {
-		const std::string lStr = std::to_string(points[0]); //cut and put in main merge function
-		const std::string mStr = std::to_string(points[1]);
-		const std::string nStr = std::to_string(points[2]);
-		const std::string pStr = std::to_string(points[3]);
-		const std::string zStr = std::to_string(max);
-		HANDLE h[0] = CreateFile(lStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-		HANDLE h[1] = CreateFile(mStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-		//HANDLE h[2] = CreateFile(nStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-		//HANDLE h[3] = CreateFile(pStr.c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-		HANDLE h = CreateFile(zStr.c_str(), GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-		h1Read = ReadFile(h[0], buf1, MAX_BUF/4, &dH[0], NULL);
-		h2Read = ReadFile(h[1], buf2, MAX_BUF/4, &dH[1], NULL);
-
-
-		while (ha < MAX_BUF / 48 || hb < MAX_BUF / 48 || hc < MAX_BUF / 48 || hd < MAX_BUF / 48) // at least one buffer is not empty
+		for (int aa = start_point; aa < a; aa++)
 		{
-			if (buf + sizeof(HeaderGraph) >= OUT_BUF)
+			v.push_back(std::to_string(points[aa])); //cut and put in main merge function
+			h[aa] = CreateFile(v[0].c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+			hRead[aa] = ReadFile(h[aa], buf[aa], MAX_BUF / 4, &dH[aa], NULL);
+			dw = GetLastError();
+			std::cout << "General failure. GetLastError returned " << std::hex
+				<< dw <<std::dec<<"for file "<<aa<<std::endl;
+		}
+		//	v.push_back(std::to_string(points[1]));
+		//	v.push_back(std::to_string(points[2]));
+		//	v.push_back(std::to_string(points[3]));
+
+		//	h[0] = CreateFile(v[0].c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		//	h[1] = CreateFile(v[1].c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		//	h[2] = CreateFile(v[2].c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		//	h[3] = CreateFile(v[3].c_str(), GENERIC_READ, 0, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+			//h1Read = ReadFile(h[0], buf1, MAX_BUF/4, &dH[0], NULL);
+			//h2Read = ReadFile(h[1], buf2, MAX_BUF/4, &dH[1], NULL);
+			//h3Read = ReadFile(h[2], buf3, MAX_BUF/4, &dH[2], NULL);
+			//h4Read = ReadFile(h[3], buf4, MAX_BUF/4, &dH[3], NULL);
+
+		for (int ll = 0; ll < a;ll++)
+		{
+		if (hCount[ll] < MAX_BUF / 48) // at least one buffer is not empty
+		{
+			if (sizeof(HeaderGraph)*(ho + 1) >= OUT_BUF)
 			{
-				h5Write = write_to_file(h, buf, h5Write);
+				h5Write = write_to_file(hOut, bufOut, h5Write);
 				ho = 0;
 			}
 
 			else //still have space in outbuffer
 			{
-				if (buf1[ha]->hash < buf2[hb]->hash)
+				HeaderGraph temp1, temp2, temp;
+				temp1 = (buf[0][hCount[0]].hash <= buf[1][hCount[1]].hash) ? buf[0][hCount[0]] : buf[1][hCount[1]];
+				temp2 = (buf[2][hCount[2]].hash <= buf[3][hCount[3]].hash) ? buf[2][hCount[2]] : buf[3][hCount[3]];
+				temp = (temp1.hash <= temp2.hash) ? temp1 : temp2;
+				if (temp.hash == buf[0][hCount[0]].hash)
 				{
-					old1 = ha;
-					while (buf1[ha]->hash == buf1[old1]->hash)
-					{
-						ha++;
-					}
-					memcpy(buf + ho, buf1 + old1, (ha - old1)*sizeof(HeaderGraph));
-					ho += (ha - old1);
+					old[0] = hCount[0];
+					while (temp.hash == buf[0][++hCount[0]].hash)
+						temp.len++;
+					//memcpy(buf + ho, temp, *sizeof(HeaderGraph));
+					//ho += ha - old1;
+
+
 				}
-				else
+				if (temp.hash == buf[1][hCount[1]].hash)
 				{
-					old2 = hb;
-					while (buf2[hb]->hash == buf2[old2]->hash)
-					{
-						hb++;
-					}
-					memcpy(buf + ho, buf2 + old2, (hb - old2)*sizeof(HeaderGraph));
-					ho += (hb - old2);
+					old[1] = hCount[1];
+					while (temp.hash == buf[1][++hCount[1]].hash)
+						temp.len++;
+					//memcpy(buf + ho, buf2 + old2, (hb - old2)*sizeof(HeaderGraph));
+					//ho += hb - old2;
+
+
 				}
+				if (temp.hash == buf[2][hCount[2]].hash)
+				{
+					old[2] = hCount[2];
+					while (temp.hash == buf[2][++hCount[2]].hash)
+						temp.len++;
+					//memcpy(buf + ho, buf3 + old3, (hc - old3)*sizeof(HeaderGraph));
+					//ho ++;
 
 
+				}
+				if (temp.hash == buf[3][hCount[3]].hash)
+				{
+					old[3] = hCount[3];
+					while (temp.hash == buf[3][++hCount[3]].hash)
+						temp.len++;
+					//memcpy(buf + ho, buf4 + old4, (hd - old4)*sizeof(HeaderGraph));
+					//ho++;
+				}
+				ho++;
+
 
 			}
-			if (ha == MAX_BUF / 48)
+			if (hCount[0] == MAX_BUF / 48)
 			{
-				h1Read = ReadFile(h[1], buf1, MAX_BUF / 4, &dH[0], NULL);
-				ha = 0;
+				hRead[0] = ReadFile(h[0], buf[0], MAX_BUF / 4, &dH[0], NULL);
+				hCount[0] = 0;
 			}
-			if (hb == MAX_BUF / 48)
+			if (hCount[1] == MAX_BUF / 48)
 			{
-				h2Read = ReadFile(h[2], buf2, MAX_BUF / 4, &dH[1], NULL);
-				hb = 0;
+				hRead[1] = ReadFile(h[1], buf[1], MAX_BUF / 4, &dH[1], NULL);
+				hCount[1] = 0;
 			}
-			if (hc == MAX_BUF / 48)
+			if (hCount[2] == MAX_BUF / 48)
 			{
-				h3Read = ReadFile(h[3], buf3, MAX_BUF / 4, &dH[2], NULL);
-				hc = 0;
+				hRead[2] = ReadFile(h[2], buf[2], MAX_BUF / 4, &dH[2], NULL);
+				hCount[2] = 0;
 			}
-			if (hd == MAX_BUF / 48)
+			if (hCount[3] == MAX_BUF / 48)
 			{
-				h4Read = ReadFile(h[4], buf4, MAX_BUF / 4, &dH[3], NULL);
-				hd = 0;
+				hRead[3] = ReadFile(h[3], buf[3], MAX_BUF / 4, &dH[3], NULL);
+				hCount[3] = 0;
 			}
 
 		}
+	}
 		if (dH[0] == 0)
 		{
-			CloseHandle(h1);
+			CloseHandle(h[0]);
 			merge_empty[0] = 1;
 		}
 		if (dH[1] == 0)
 		{
-			CloseHandle(h2);
+			CloseHandle(h[1]);
 			merge_empty[1] = 1;
 		}
 		if (dH[2] == 0)
 		{
-			CloseHandle(h3);
+			CloseHandle(h[2]);
 			merge_empty[2] = 1;
 		}
 		if (dH[3] == 0)
 		{
-			CloseHandle(h4);
+			CloseHandle(h[3]);
 			merge_empty[3] = 1;
 		}
 
 
 	} while (dH[0] || dH[1] || dH[2] || dH[3]);
-	CloseHandle(h);
+	CloseHandle(hOut);
 
 	for (int var = 0; var < 4;var++)
 		if (merge_empty[var] == 0)
@@ -217,17 +269,30 @@ void merge_files(int start_point, int *max, int a = 4) //merges two/built for fo
 
 void merge_call(int l)
 {
+	std::cout << "Entered merge call\n";
 	int k = num_merges(l);
-	int *merger = new int[k]();
-	int *max = &k;
-	int a = count_zeroes(merger, k);
-	int l = 0;
+	int *merger = new int[k+l*2]();
+	for (int jaja = 0; jaja < l; jaja++)
+		merger[jaja] = 1;
+	int num = k + l;
+	int *max = &num;
+	int a = count_zeroes(merger, k+l);
+	int i = 0;
 	while (a > 1)
 	{
-		if(a<=4)
-			merge_files(l,max,a);
-		else merge_files(l,max);
-		
+		if (a <= 4)
+		{
+			merge_files(l, max, l+a);
+			for (int var = 0; var < a; var++)
+				merger[l + var] = 1;
+		}
+		else
+		{
+			merge_files(i, max);
+			for (int var = 0; var < 4; var++)
+				merger[i + var] = 1;
+		}
+		a = count_zeroes(merger, k + l);
 
 
 	}
@@ -453,9 +518,11 @@ int main(int argc, char *argv[])
 		} while (bResult && red!=0);
 		
 		//merge using l
-		//merge_call(l);
-
-
+		clock_t begin = clock();
+		merge_call(l);
+		clock_t end = clock();
+		double elapsed = double(end - begin) / CLOCKS_PER_SEC;
+		std::cout << elapsed << std::endl;
 		free(myBuf);
 	} 
 	std::cout << "\nDONE!\n";
